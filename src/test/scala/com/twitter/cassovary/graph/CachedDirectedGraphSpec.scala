@@ -306,6 +306,10 @@ class CachedDirectedGraphSpec extends Specification {
      "provide the correct edge count" in {
        graph.edgeCount mustBe 10L
      }
+
+     "Do a concurrent random walk properly" in {
+       graph must RunConcurrently(GraphDir.OutDir, renumberedEdgeMap, renumberedReachability)
+     }
   }
 
   "Renumbered guava-based graph containing only in edges" definedAs renumberedSmallGraphInOnly should {

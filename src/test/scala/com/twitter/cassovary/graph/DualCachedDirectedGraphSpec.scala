@@ -42,18 +42,22 @@ class DualCachedDirectedGraphSpec extends Specification {
 
   def makeRenumberedDualGraph =
     CachedDirectedGraph(Seq(iteratorFunc), Seq(inIteratorFunc), MoreExecutors.sameThreadExecutor(),
-      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", true)
+      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", true, false)
 
   def makeDualGraph =
     CachedDirectedGraph(Seq(iteratorFunc), Seq(inIteratorFunc), MoreExecutors.sameThreadExecutor(),
-      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", false)
+      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", false, false)
+
+  def makeInDiskDualGraph =
+    CachedDirectedGraph(Seq(iteratorFunc), Seq(inIteratorFunc), MoreExecutors.sameThreadExecutor(),
+      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", false, true)
 
   "Regular FastLRU-based Dual Graph containing out and in edges" should {
     doBefore {
       graph = makeDualGraph
     }
 
-    "map only out edges" in {
+    "map all edges" in {
       getNode(1).get must DeepEqualsNode((NodeMaker(1, Array(2, 3, 4), Array(2, 3, 6))))
       getNode(2).get must DeepEqualsNode((NodeMaker(2, Array(1), Array(1, 5, 6))))
       getNode(3).get must DeepEqualsNode((NodeMaker(3, Array(1), Array(1, 6))))
@@ -83,12 +87,47 @@ class DualCachedDirectedGraphSpec extends Specification {
 
   }
 
+  "In-Disk FastLRU-based Dual Graph containing out and in edges" should {
+    doBefore {
+      graph = makeInDiskDualGraph
+    }
+
+    "map all edges" in {
+      getNode(1).get must DeepEqualsNode((NodeMaker(1, Array(2, 3, 4), Array(2, 3, 6))))
+      getNode(2).get must DeepEqualsNode((NodeMaker(2, Array(1), Array(1, 5, 6))))
+      getNode(3).get must DeepEqualsNode((NodeMaker(3, Array(1), Array(1, 6))))
+      getNode(4).get must DeepEqualsNode((NodeMaker(4, Array(), Array(1, 6))))
+      getNode(5).get must DeepEqualsNode((NodeMaker(5, Array(2), Array())))
+      getNode(6).get must DeepEqualsNode((NodeMaker(6, Array(1, 2, 3, 4), Array())))
+      getNode(7) mustEqual None
+      getNode(100) mustEqual None
+    }
+
+    "iterate over all nodes" in {
+      graph must DeepEqualsNodeIterable((1 to 6).flatMap(getNode(_)))
+    }
+
+    "provide the correct node count" in {
+      graph.nodeCount mustBe 6
+    }
+
+    "provide the correct edge count" in {
+      graph.edgeCount mustBe 10L
+    }
+
+    "concurrent test works" in {
+      graph must RunConcurrently(GraphDir.OutDir, edgeMap, reachability, 5)
+      graph must RunConcurrently(GraphDir.InDir, inEdgeMap, inReachability, 3)
+    }
+
+  }
+
   "Renumbered FastLRU-based Dual Graph containing out and in edges" should {
     doBefore {
       graph = makeRenumberedDualGraph
     }
 
-    "map only out edges" in {
+    "map all edges" in {
       getNode(1).get must DeepEqualsNode((NodeMaker(1, Array(2, 3, 6), Array(2, 3, 5))))
       getNode(2).get must DeepEqualsNode((NodeMaker(2, Array(1), Array(1, 4, 5))))
       getNode(3).get must DeepEqualsNode((NodeMaker(3, Array(1), Array(1, 5))))

@@ -35,10 +35,10 @@ import io.AdjacencyListGraphReader
 object GraphLoader {
   def apply(directory: String, directoryIn: Option[String], cacheType: String, cacheMaxNodes:Int, cacheMaxEdges:Long,
             shardDirectories: Array[String], inShardDirectories: Array[String], numShards: Int, numRounds: Int,
-            useCachedValues: Boolean, cacheDirectory: String) = {
+            useCachedValues: Boolean, cacheDirectory: String, inDisk: Boolean) = {
     new GraphLoader().loadGraphFromDirectory(directory, directoryIn, cacheType, cacheMaxNodes, cacheMaxEdges,
       shardDirectories, inShardDirectories, numShards, numRounds,
-      useCachedValues, cacheDirectory)
+      useCachedValues, cacheDirectory, inDisk)
   }
 }
 
@@ -47,17 +47,17 @@ class GraphLoader {
   // Return a CachedDirectedGraph object
   def loadGraphFromDirectory(directory: String, directoryIn: Option[String], cacheType: String, cacheMaxNodes:Int, cacheMaxEdges:Long,
                              shardDirectories: Array[String], inShardDirectories: Array[String], numShards: Int, numRounds: Int,
-                             useCachedValues: Boolean, cacheDirectory: String) = {
+                             useCachedValues: Boolean, cacheDirectory: String, inDisk: Boolean) = {
     directoryIn match {
       case Some(directory2) => CachedDirectedGraph(new AdjacencyListGraphReader(directory, "part").iteratorSeq,
         new AdjacencyListGraphReader(directory2, "part").iteratorSeq,
         Executors.newFixedThreadPool(8),
         StoredGraphDir.OnlyOut, cacheType, cacheMaxNodes, cacheMaxEdges,
-        shardDirectories, inShardDirectories, numShards, numRounds, useCachedValues, cacheDirectory, true)
+        shardDirectories, inShardDirectories, numShards, numRounds, useCachedValues, cacheDirectory, true, inDisk)
       case None => CachedDirectedGraph(new AdjacencyListGraphReader(directory, "part").iteratorSeq, null,
         Executors.newFixedThreadPool(8),
         StoredGraphDir.OnlyOut, cacheType, cacheMaxNodes, cacheMaxEdges,
-        shardDirectories, inShardDirectories, numShards, numRounds, useCachedValues, cacheDirectory, true)
+        shardDirectories, inShardDirectories, numShards, numRounds, useCachedValues, cacheDirectory, true, inDisk)
     }
   }
 }

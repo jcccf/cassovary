@@ -192,6 +192,16 @@ class LoaderSerializerWriter(filename: String) {
     dos.close()
     new File(filename+".temp").renameTo(new File(filename))
   }
+
+  def closeAndOverwrite = {
+    fc.close()
+    dos.close()
+    val f = new File(filename)
+    if (f.exists()) {
+      f.delete()
+    }
+    new File(filename+".temp").renameTo(f)
+  }
 }
 
 /**
@@ -305,11 +315,21 @@ class LoaderSerializer(var directory: String, useCachedValues: Boolean) {
                   readFn: (LoaderSerializerReader => Unit)) = {
     if (!useCachedValues || !exists(filename)) {
       log.info("Recomputing...")
-      writeFn(write(filename))
+      val w = write(filename)
+      try { writeFn(w) } finally { w.close }
     }
     else {
       log.info("Loading cached version...")
-      readFn(read(filename))
+      val r = read(filename)
+      try { readFn(r) } finally { r.close }
     }
+  }
+
+  /**
+   * Force a write to this file. Overwrites the original file if it already exists.
+   */
+  def forceWrite(filename: String)(writeFn: (LoaderSerializerWriter => Unit)) {
+    val w = write(filename)
+    try { writeFn(w) } finally { w.closeAndOverwrite }
   }
 }

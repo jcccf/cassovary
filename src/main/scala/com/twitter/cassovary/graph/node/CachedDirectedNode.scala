@@ -16,6 +16,7 @@ package com.twitter.cassovary.graph.node
 import com.twitter.cassovary.graph.{StoredGraphDir, Node}
 import com.twitter.cassovary.graph.StoredGraphDir.StoredGraphDir
 import com.twitter.cassovary.util.cache.IntArrayCache
+import com.twitter.cassovary.util.DiskIntArrayReader
 
 abstract class CachedDirectedNode (var id: Int, var size: Int) extends Node
 
@@ -174,4 +175,29 @@ object DualCachedDirectedNode {
     }
   }
 
+  /**
+   * Like ShapeShifter, but uses a DiskIntArrayReader for reading in-neighbors.
+   * Any node operation that depends on retrieving the list of (or # of) in-neighbors
+   * will result in a disk read. However, this means that we incur almost 0 memory overhead even though
+   * we can now get in-edges.
+   *
+   * @param nodeId
+   * @param idToNumEdgesOut
+   * @param outCache
+   * @param inReader
+   * @return
+   */
+  def inDiskShapeShifter(nodeId: Int, idToNumEdgesOut: (Int => Int), outCache: IntArrayCache,
+                        inReader: DiskIntArrayReader) = {
+    new DualCachedDirectedNode(nodeId, 0, 0) {
+      def inboundNodes = inReader.get(id)
+      def outboundNodes = try {
+        if (idToNumEdgesOut(id) > 0) outCache.get(id) else empty
+      } catch {
+        case _ => empty
+      }
+      override def inboundCount = inReader.getNumEdges(id)
+      override def outboundCount = try { idToNumEdgesOut(id) } catch { case _ => 0 }
+    }
+  }
 }

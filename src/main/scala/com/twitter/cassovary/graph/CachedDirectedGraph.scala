@@ -84,12 +84,61 @@ object CachedDirectedGraph {
   }
 
   /**
-   * Generate offset tables for in-edges
+   * Generate offset and numEdge tables for out-edges, not renumbered
+   */
+  def generateOffsetTables(iteratorSeq: Seq[ () => Iterator[NodeIdEdgesMaxId] ],
+                           executorService: ExecutorService,
+                           serializer: LoaderSerializer, name: String, numShards: Int, maxId: Int) = {
+
+    var nodeIdSet: mutable.BitSet = null
+    var idToIntOffset: Array[Long] = null
+    var idToNumEdges: Array[Int] = null
+    var edgeOffsets: Array[AtomicLong] = null
+
+    serializer.writeOrRead("step2x.txt", { writer =>
+      nodeIdSet = new mutable.BitSet(maxId+1)
+      idToIntOffset = new Array[Long](maxId+1)
+      idToNumEdges = new Array[Int](maxId+1)
+      edgeOffsets = new Array[AtomicLong](numShards)
+      (0 until numShards).foreach { i => edgeOffsets(i) = new AtomicLong() }
+      Stats.time("graph_load_generating_offset_tables") {
+        def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) {
+          iteratorFunc() foreach { item =>
+            val id = item.id
+            val itemEdges = item.edges.length
+            // Update nodeId set
+            nodeIdSet(id) = true
+            item.edges foreach { edge => nodeIdSet(edge) = true }
+            // Store offsets
+            val edgeOffset = edgeOffsets(id % numShards).getAndAdd(itemEdges)
+            idToNumEdges(id) = itemEdges
+            idToIntOffset(id) = edgeOffset
+          }
+        }
+        ExecutorUtils.parallelWork[() => Iterator[NodeIdEdgesMaxId], Unit](executorService,
+          iteratorSeq, readOutEdges).toArray.map { future => future.asInstanceOf[Future[Unit]].get }
+      }
+      log.info("Writing offset tables to file...")
+      writer.bitSet(nodeIdSet)
+        .arrayOfLong(idToIntOffset)
+        .arrayOfInt(idToNumEdges)
+        .atomicLongArray(edgeOffsets)
+    }, { reader =>
+      nodeIdSet = reader.bitSet()
+      idToIntOffset = reader.arrayOfLong()
+      idToNumEdges = reader.arrayOfInt()
+      edgeOffsets = reader.atomicLongArray()
+    })
+    (nodeIdSet, idToIntOffset, idToNumEdges, edgeOffsets)
+  }
+
+  /**
+   * Generate offset tables for in-edges, both renumbered and not renumbered
    */
   def generateOffsetTablesForIn(iteratorSeq: Seq[ () => Iterator[NodeIdEdgesMaxId] ],
                                 executorService: ExecutorService,
                                 serializer: LoaderSerializer, name: String, numShards: Int,
-                                inArraySize: Int, ren: Renumberer = null, inDisk: Boolean = false) = {
+                                inArraySize: Int, ren: Renumberer = null) = {
     var idToIntOffset: Array[Long] = null
     var idToNumEdges: Array[Int] = null
     var edgeOffsets: Array[AtomicLong] = null
@@ -137,16 +186,11 @@ object CachedDirectedGraph {
 
       writer.atomicLongArray(edgeOffsets)
     }, { reader =>
-      if (!inDisk) {
-        val r = new LongIntReader(serializer.directory + "/lin_" + name)
-        val in = r.readLongAndIntArray
-        r.close()
-        idToIntOffset = in._1; idToNumEdges = in._2
-        edgeOffsets = reader.atomicLongArray()
-      }
-      else {
-        log.info("InDisk enabled, so skipping loading of in-offsets and in-numEdges")
-      }
+      val r = new LongIntReader(serializer.directory + "/lin_" + name)
+      val in = r.readLongAndIntArray
+      r.close()
+      idToIntOffset = in._1; idToNumEdges = in._2
+      edgeOffsets = reader.atomicLongArray()
     })
     (idToIntOffset, idToNumEdges, edgeOffsets)
   }
@@ -424,6 +468,7 @@ object CachedDirectedGraph {
             ren = null
         })
 
+        // TODO don't load this yet if we haven't computed idToIntOffsetIn, idToNumEdgesIn to minimize memory use
         idToIntOffset = reader.arrayOfLong()
         idToNumEdges = reader.arrayOfInt()
         edgeOffsets = reader.atomicLongArray()
@@ -439,6 +484,14 @@ object CachedDirectedGraph {
         numShards, numRounds, edgeOffsets, idToIntOffset, idToNumEdges, ren)
 
       if (inIteratorSeq != null) {
+
+        var reloadOut = false
+        if (inDisk && !serializer.exists("stepi3r.txt")) {
+          idToIntOffset = null
+          idToNumEdges = null
+          reloadOut = true
+        }
+
         // Step i1r Generate Offset Table Counts
         log.info("Generating offset tables for in-shards (renumbered)...")
         // TODO to avoid ArrayOutOfBounds inArraySize is the max possible id. However, this isn't memory-efficient.
@@ -454,6 +507,19 @@ object CachedDirectedGraph {
         log.info("Writing to in-shards in rounds (renumbered)...")
         writeShardsInRoundsRenumbered(inIteratorSeq, executorService, serializer, "stepi3r.txt", shardDirectoriesIn,
           numShards, numRounds, edgeOffsetsIn, idToIntOffsetIn, idToNumEdgesIn, ren)
+
+        if (reloadOut) {
+          idToIntOffsetIn = null
+          idToNumEdgesIn = null
+          serializer.writeOrRead("step2xr.txt", { writer => throw new Exception("2xr reload: Writer impossible! ") },
+          { reader =>
+            nodeIdSet = reader.bitSet()
+            idToIntOffset = reader.arrayOfLong()
+            idToNumEdges = reader.arrayOfInt()
+            edgeOffsets = reader.atomicLongArray()
+          })
+        }
+
       }
 
     }
@@ -464,40 +530,8 @@ object CachedDirectedGraph {
       // Generate the lookup table for nodeIdSet
       // Generate and store shard offsets and # of edges for each node
       log.info("Generating offset tables...")
-      serializer.writeOrRead("step2x.txt", { writer =>
-        nodeIdSet = new mutable.BitSet(maxId+1)
-        idToIntOffset = new Array[Long](maxId+1)
-        idToNumEdges = new Array[Int](maxId+1)
-        edgeOffsets = new Array[AtomicLong](numShards)
-        (0 until numShards).foreach { i => edgeOffsets(i) = new AtomicLong() }
-        Stats.time("graph_load_generating_offset_tables") {
-          def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) {
-            iteratorFunc() foreach { item =>
-              val id = item.id
-              val itemEdges = item.edges.length
-              // Update nodeId set
-              nodeIdSet(id) = true
-              item.edges foreach { edge => nodeIdSet(edge) = true }
-              // Store offsets
-              val edgeOffset = edgeOffsets(id % numShards).getAndAdd(itemEdges)
-              idToNumEdges(id) = itemEdges
-              idToIntOffset(id) = edgeOffset
-            }
-          }
-          ExecutorUtils.parallelWork[() => Iterator[NodeIdEdgesMaxId], Unit](executorService,
-            outIteratorSeq, readOutEdges).toArray.map { future => future.asInstanceOf[Future[Unit]].get }
-        }
-        log.info("Writing offset tables to file...")
-        writer.bitSet(nodeIdSet)
-          .arrayOfLong(idToIntOffset)
-          .arrayOfInt(idToNumEdges)
-          .atomicLongArray(edgeOffsets)
-      }, { reader =>
-        nodeIdSet = reader.bitSet()
-        idToIntOffset = reader.arrayOfLong()
-        idToNumEdges = reader.arrayOfInt()
-        edgeOffsets = reader.atomicLongArray()
-      })
+      val o = generateOffsetTables(outIteratorSeq, executorService, serializer, "step2x.txt", numShards, maxId)
+      nodeIdSet = o._1; idToIntOffset = o._2; idToNumEdges = o._3; edgeOffsets = o._4
 
       // Step 3 - Allocating shards
       log.info("Allocating shards...")
@@ -513,6 +547,12 @@ object CachedDirectedGraph {
       numNodes = countTotalNodes(serializer, "step5.txt", maxId, nodeIdSet)
 
       if (inIteratorSeq != null) {
+
+        var reloadOut = false
+        if (inDisk && !serializer.exists("stepi3.txt")) {
+          nodeIdSet = null; idToIntOffset = null; idToNumEdges = null; edgeOffsets = null; reloadOut = true
+        }
+
         // Step i1r - Generate Offset Table Counts
         log.info("Generating offset tables for in-shards...")
         val r = generateOffsetTablesForIn(inIteratorSeq, executorService, serializer, "stepi1.txt", numShards, inMaxId)
@@ -526,6 +566,13 @@ object CachedDirectedGraph {
         log.info("Writing to in-shards in rounds...")
         writeShardsInRounds(inIteratorSeq, executorService, serializer, "stepi3.txt", shardDirectoriesIn,
           numShards, numRounds, edgeOffsetsIn, idToIntOffsetIn, idToNumEdgesIn)
+
+        if (reloadOut) {
+          idToIntOffsetIn = null; idToNumEdgesIn = null; edgeOffsetsIn = null
+          val o = generateOffsetTables(outIteratorSeq, executorService, serializer, "step2x.txt", numShards, maxId)
+          nodeIdSet = o._1; idToIntOffset = o._2; idToNumEdges = o._3; edgeOffsets = o._4
+        }
+
       }
     }
 
@@ -545,6 +592,7 @@ object CachedDirectedGraph {
       nodeWithOutEdgesMaxId))
     log.info("numNodes is %s, (original) maxId is %s".format(numNodes, maxId))
     log.info("realMaxId is %s, realMaxIdOutEdges is %s".format(realMaxId, realMaxIdOutEdges))
+    log.info("inMaxId is %s, nodeWithInEdgesMaxId is %s, node WithInEdgesCount is %s".format(inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount))
 
     // Parse out cacheType and nodeType for FastCachedDirectedGraph
     val (cType, nType) = if (cacheType.contains("_")) {

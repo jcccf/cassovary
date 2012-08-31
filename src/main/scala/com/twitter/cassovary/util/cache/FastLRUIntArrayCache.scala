@@ -13,20 +13,22 @@
  */
 package com.twitter.cassovary.util.cache
 
+import com.twitter.cassovary.util.{LinkedIntIntMap, MultiDirIntShardsReader}
 import com.twitter.ostrich.stats.Stats
 import concurrent.Lock
-import com.twitter.cassovary.util.{LinkedIntIntMap, MultiDirIntShardsReader}
 
 object FastLRUIntArrayCache {
   /**
-   * Array-based LRU algorithm implementation
-   * @param shardDirectories
-   * @param numShards
-   * @param maxId
-   * @param cacheMaxNodes
-   * @param cacheMaxEdges
-   * @param idToIntOffset
-   * @param idToNumEdges
+   * Array-based LRU algorithm implementation. Elements are
+   * evicted in a least-recently-used order.
+   *
+   * @param shardDirectories Directories where edge shards live
+   * @param numShards Number of edge shards
+   * @param maxId Maximum id that will be requested
+   * @param cacheMaxNodes Maximum number of nodes the cache can have
+   * @param cacheMaxEdges Maximum number of edges the cache can have
+   * @param idToIntOffset Array of node id -> offset in a shard
+   * @param idToNumEdges Array of node id -> number of edges
    */
   def apply(shardDirectories: Array[String], numShards: Int,
             maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,

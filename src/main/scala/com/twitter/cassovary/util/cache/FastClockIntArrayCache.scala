@@ -13,20 +13,27 @@
  */
 package com.twitter.cassovary.util.cache
 
-import scala.collection.mutable
 import com.twitter.cassovary.util.MultiDirIntShardsReader
+import scala.collection.mutable
 
-/**
- * Array-based Clock replacement algorithm implementation
- * @param shardDirectories
- * @param numShards
- * @param maxId
- * @param cacheMaxNodes
- * @param cacheMaxEdges
- * @param idToIntOffset
- * @param idToNumEdges
- */
 object FastClockIntArrayCache {
+  /**
+   * Create a clock-based Int Array Cache. Meaning that on a cache hit,
+   * a bit is set indicating that the element was recently used.
+   * When we need to evict an element, examine each cache slot in turn. If
+   * the bit is set, clear the bit and move on. If the bit was not set, evict
+   * that element and continue if we need to evict more elements to create enough
+   * space.
+   *
+   * @param shardDirectories Directories where edge shards live
+   * @param numShards Number of edge shards
+   * @param maxId Maximum id that will be requested
+   * @param cacheMaxNodes Maximum number of nodes the cache can have
+   * @param cacheMaxEdges Maximum number of edges the cache can have
+   * @param idToIntOffset Array of node id -> offset in a shard
+   * @param idToNumEdges Array of node id -> number of edges
+   * @return a FastClockIntArrayCache
+   */
   def apply(shardDirectories: Array[String], numShards: Int,
             maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
             idToIntOffset: Array[Long], idToNumEdges: Array[Int]): FastClockIntArrayCache = {
@@ -40,6 +47,10 @@ object FastClockIntArrayCache {
   }
 }
 
+/**
+ * Helper class for FastClockIntArrayCache that allows elements to be
+ * shared among child instances
+ */
 class FastClockReplace(maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long) {
 
   val clockBits = new mutable.BitSet(cacheMaxNodes)

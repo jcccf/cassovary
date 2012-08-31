@@ -14,10 +14,25 @@
 package com.twitter.cassovary.util.cache
 
 import com.twitter.ostrich.stats.Stats
-import concurrent.Lock
 import com.twitter.cassovary.util.{LinkedIntIntMap, MultiDirIntShardsReader}
+import concurrent.Lock
 
 object LocklessReadFastLRUIntArrayCache {
+
+  /**
+   * Similar to the {@code BufferedFastLRUIntArrayCache} except that
+   * this version has lock-free reads when not updating the cache. However,
+   * this version consumes more memory than the BufferedFastLRUIntArrayCache
+   * and the FastLRUIntArrayCache as a cost of allowing lock-free reads.
+   *
+   * @param shardDirectories Directories where edge shards live
+   * @param numShards Number of edge shards
+   * @param maxId Maximum id that will be requested
+   * @param cacheMaxNodes Maximum number of nodes the cache can have
+   * @param cacheMaxEdges Maximum number of edges the cache can have
+   * @param idToIntOffset Array of node id -> offset in a shard
+   * @param idToNumEdges Array of node id -> number of edges
+   */
   def apply(shardDirectories: Array[String], numShards: Int,
             maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
             idToIntOffset: Array[Long], idToNumEdges: Array[Int]): LocklessReadFastLRUIntArrayCache = {
@@ -33,16 +48,6 @@ object LocklessReadFastLRUIntArrayCache {
   }
 }
 
-/**
- * Array-based LRU algorithm implementation
- * @param shardDirectories
- * @param numShards
- * @param maxId
- * @param cacheMaxNodes
- * @param cacheMaxEdges
- * @param idToIntOffset
- * @param idToNumEdges
- */
 class LocklessReadFastLRUIntArrayCache private(shardDirectories: Array[String], numShards: Int,
                                                maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
                                                idToIntOffset: Array[Long], idToNumEdges: Array[Int],
@@ -115,10 +120,8 @@ class LocklessReadFastLRUIntArrayCache private(shardDirectories: Array[String], 
         else {
           numbers.misses += 1
 
-          //println("Going to empty...")
           // Empty buffer
           emptyBuffer(threadId)
-          //println("Emptied buffer!")
 
           // Evict from cache
           numbers.currRealCapacity += numEdges

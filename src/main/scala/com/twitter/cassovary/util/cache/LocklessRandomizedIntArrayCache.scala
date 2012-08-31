@@ -13,20 +13,28 @@
  */
 package com.twitter.cassovary.util.cache
 
-import util.Random
-import java.util.concurrent.atomic.{AtomicReferenceArray, AtomicLong, AtomicIntegerArray}
 import com.twitter.cassovary.util.MultiDirIntShardsReader
+import java.util.concurrent.atomic.{AtomicReferenceArray, AtomicLong, AtomicIntegerArray}
+import util.Random
 
 object LocklessRandomizedIntArrayCache {
+
+  /**
+   * Create a LocklessRandomized Int Array Cache. Evicts elements in a random order.
+   * Both reads and writes are lock-free, although for writes, consistency
+   * is ensured through atomic updates instead of locks.
+   *
+   * @param shardDirectories Directories where edge shards live
+   * @param numShards Number of edge shards
+   * @param maxId Maximum id that will be requested
+   * @param cacheMaxNodes Maximum number of nodes the cache can have
+   * @param cacheMaxEdges Maximum number of edges the cache can have
+   * @param idToIntOffset Array of node id -> offset in a shard
+   * @param idToNumEdges Array of node id -> number of edges
+   */
   def apply(shardDirectories: Array[String], numShards: Int,
             maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
             idToIntOffset: Array[Long], idToNumEdges: Array[Int]) = {
-    val reader = new MultiDirIntShardsReader(shardDirectories, numShards)
-    val rand = new Random
-    val idToArray = new AtomicReferenceArray[Array[Int]](maxId + 1)
-    val indexToId = new AtomicIntegerArray(cacheMaxNodes)
-    var hits, misses: Long = 0L
-    var currRealCapacity: AtomicLong = new AtomicLong // how many edges are we storing?
 
     new LocklessRandomizedIntArrayCache(shardDirectories, numShards,
       maxId, cacheMaxNodes, cacheMaxEdges,
@@ -62,7 +70,6 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
   def get(id: Int) = {
     val a = idToArray.get(id)
     if (a != null) {
-      // println(Thread.currentThread().getId+" Hit! " +id)
       numbers.hits += 1
       a
     }
@@ -73,7 +80,6 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
         throw new NullPointerException("FastLRUIntArrayCache idToIntOffsetAndNumEdges %s".format(id))
       }
       else {
-        // println(Thread.currentThread().getId+" Missed! " +id)
         // Read in array
         val intArray = new Array[Int](numEdges)
         reader.readIntegersFromOffsetIntoArray(id, idToIntOffset(id), numEdges, intArray, 0)
@@ -81,14 +87,10 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
         val a = idToArray.getAndSet(id, intArray)
         if (a == null) {
 
-          // val t = System.nanoTime()
-          // println("Starting "+t)
-
           var change = numEdges
 
           // Location to place new id must be constant so that we don't evict an id multiple times
           val idToEvict = indexToId.getAndSet(id % cacheMaxNodes, id)
-          // println(Thread.currentThread().getId+" Added " + id + " received " + idToEvict + " " + numbers.currRealCapacity + " " + cacheMaxEdges + " " + indexToId)
           if (idToEvict > 0) {
             // Deference idToEvict only if they aren't the same
             if (idToEvict != id) {
@@ -100,13 +102,7 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
             else {
               change -= numEdges
             }
-            // if (mappy(indexToId.get(0)) + mappy(indexToId.get(1)) != currRealCapacity.get) {
-            //  throw new Exception(id+" "+idToEvict+" "+indexToId + " " + currRealCapacity + "error!")
-            //}
-            // println(Thread.currentThread().getId+" Evicted " + idToEvict + " " + numbers.currRealCapacity + " " + cacheMaxEdges + " " + indexToId)
           }
-
-
 
           // Then keep evicting until we go under the capacity limit
           var whileCount = 0
@@ -119,7 +115,6 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
                   currRealCapacity.addAndGet(-array.size)
                   change -= array.size
                 }
-                // println(Thread.currentThread().getId+" WEvicted " + idToEvict + " " + currRealCapacity + " " + cacheMaxEdges + " " + indexToId)
               }
               whileCount += 1
               if (whileCount % 1000 == 0) {
@@ -127,9 +122,6 @@ class LocklessRandomizedIntArrayCache private(shardDirectories: Array[String], n
               }
             }
           }
-
-          // println("Ending "+t)
-
         }
 
         intArray

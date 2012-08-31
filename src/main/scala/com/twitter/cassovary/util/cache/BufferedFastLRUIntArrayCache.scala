@@ -13,11 +13,26 @@
  */
 package com.twitter.cassovary.util.cache
 
+import com.twitter.cassovary.util.{LinkedIntIntMap, MultiDirIntShardsReader}
 import com.twitter.ostrich.stats.Stats
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import com.twitter.cassovary.util.{LinkedIntIntMap, MultiDirIntShardsReader}
 
 object BufferedFastLRUIntArrayCache {
+
+  /**
+   * Create a Buffered Fast LRU Int Array Cache. Similar to the LRU cache,
+   * except that updates to the cache are done in blocks at a specified interval.
+   * Uses a reader-writer lock to ensure consistency.
+   *
+   * @param shardDirectories Directories where edge shards live
+   * @param numShards Number of edge shards
+   * @param maxId Maximum id that will be requested
+   * @param cacheMaxNodes Maximum number of nodes the cache can have
+   * @param cacheMaxEdges Maximum number of edges the cache can have
+   * @param idToIntOffset Array of node id -> offset in a shard
+   * @param idToNumEdges Array of node id -> number of edges
+   * @return
+   */
   def apply(shardDirectories: Array[String], numShards: Int,
             maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
             idToIntOffset: Array[Long], idToNumEdges: Array[Int]): BufferedFastLRUIntArrayCache = {
@@ -33,16 +48,6 @@ object BufferedFastLRUIntArrayCache {
   }
 }
 
-/**
- * Array-based LRU algorithm implementation
- * @param shardDirectories
- * @param numShards
- * @param maxId
- * @param cacheMaxNodes
- * @param cacheMaxEdges
- * @param idToIntOffset
- * @param idToNumEdges
- */
 class BufferedFastLRUIntArrayCache private(shardDirectories: Array[String], numShards: Int,
                                            maxId: Int, cacheMaxNodes: Int, cacheMaxEdges: Long,
                                            idToIntOffset: Array[Long], idToNumEdges: Array[Int],

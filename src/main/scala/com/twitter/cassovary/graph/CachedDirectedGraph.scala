@@ -516,6 +516,8 @@ object CachedDirectedGraph {
             idToNumEdges = reader.arrayOfInt()
             edgeOffsets = reader.atomicLongArray()
           })
+        } else if (inDisk) {
+          idToIntOffsetIn = null; idToNumEdgesIn = null
         }
 
       }
@@ -547,11 +549,12 @@ object CachedDirectedGraph {
       if (inIteratorSeq != null) {
 
         var reloadOut = false
-        if (inDisk && !serializer.exists("stepi3.txt")) {
+        if (inDisk && !serializer.exists("stepi3.txt")) { // Null these out only if we've not completed inIterator stuff
           nodeIdSet = null; idToIntOffset = null; idToNumEdges = null; edgeOffsets = null; reloadOut = true
         }
 
         // Step i1r - Generate Offset Table Counts
+        // TODO don't load these in the first place if inDisk is true
         log.info("Generating offset tables for in-shards...")
         val r = generateOffsetTablesForIn(inIteratorSeq, executorService, serializer, "stepi1.txt", numShards, inMaxId)
         idToIntOffsetIn = r._1; idToNumEdgesIn = r._2; edgeOffsetsIn = r._3
@@ -565,10 +568,12 @@ object CachedDirectedGraph {
         writeShardsInRounds(inIteratorSeq, executorService, serializer, "stepi3.txt", shardDirectoriesIn,
           numShards, numRounds, edgeOffsetsIn, idToIntOffsetIn, idToNumEdgesIn)
 
-        if (reloadOut) {
+        if (reloadOut) { // Reload only if we've just completed
           idToIntOffsetIn = null; idToNumEdgesIn = null; edgeOffsetsIn = null
           val o = generateOffsetTables(outIteratorSeq, executorService, serializer, "step2x.txt", numShards, maxId)
           nodeIdSet = o._1; idToIntOffset = o._2; idToNumEdges = o._3; edgeOffsets = o._4
+        } else if (inDisk) { // Null out if inDisk
+          idToIntOffsetIn = null; idToNumEdgesIn = null; edgeOffsetsIn = null
         }
 
       }

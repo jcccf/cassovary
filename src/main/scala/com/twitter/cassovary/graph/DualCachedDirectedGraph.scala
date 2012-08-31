@@ -79,7 +79,7 @@ object FastDualCachedDirectedGraph {
     }
 
     val outCache = makeCache(shardDirectories, idToIntOffsetOut, idToNumEdgesOut, realMaxIdOutEdges)
-    val inCache = makeCache(inShardDirectories, idToIntOffsetIn, idToNumEdgesIn, realMaxIdInEdges)
+    // inCache only created if inDisk is false
 
     (inDiskParams.enabled, nodeType) match {
       case (false, "node") => new FastDualCachedDirectedGraph(nodeIdSet,
@@ -90,7 +90,8 @@ object FastDualCachedDirectedGraph {
         maxId, realMaxId, realMaxIdOutEdges, realMaxIdInEdges,
         nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
         inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount,
-        nodeCount, edgeCount, outCache, inCache)
+        nodeCount, edgeCount, outCache,
+        makeCache(inShardDirectories, idToIntOffsetIn, idToNumEdgesIn, realMaxIdInEdges))
       case (true, "node") => new InDiskFastDualCachedDirectedGraph(nodeIdSet,
         cacheMaxNodes, cacheMaxEdges,
         idToIntOffsetOut, idToNumEdgesOut,

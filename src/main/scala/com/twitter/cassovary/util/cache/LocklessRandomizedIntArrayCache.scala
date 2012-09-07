@@ -14,7 +14,7 @@
 package com.twitter.cassovary.util.cache
 
 import com.twitter.cassovary.util.MultiDirIntShardsReader
-import java.util.concurrent.atomic.{AtomicReferenceArray, AtomicLong, AtomicIntegerArray}
+import java.util.concurrent.atomic.{AtomicIntegerArray, AtomicLong, AtomicReferenceArray}
 import util.Random
 
 object LocklessRandomizedIntArrayCache {

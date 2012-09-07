@@ -13,8 +13,8 @@
  */
 package com.twitter.cassovary.util.cache
 
-import org.specs.Specification
 import com.twitter.cassovary.util.{FileUtils, IntShardsWriter}
+import org.specs.Specification
 
 class FastLRUIntArrayCacheSpec extends Specification {
 

@@ -13,9 +13,8 @@
  */
 package com.twitter.cassovary.util.cache
 
+import com.twitter.cassovary.util.{FileUtils, IntShardsWriter}
 import org.specs.Specification
-import com.twitter.cassovary.util.{IntShardsReader, FileUtils, IntShardsWriter}
-import java.io.File
 
 class FastClockIntArrayCacheSpec extends Specification {
   "FastClockIntArrayCache" should {

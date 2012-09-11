@@ -33,16 +33,27 @@ class DualCachedDirectedGraphSpec extends Specification {
     NodeIdEdgesMaxId(5, Array(2)),
     NodeIdEdgesMaxId(6, Array(1,2,3,4))).iterator
 
+  val renumberedIteratorFunc = () => Seq(NodeIdEdgesMaxId(1, Array(2,3,6)),
+    NodeIdEdgesMaxId(2, Array(1)),
+    NodeIdEdgesMaxId(3, Array(1)),
+    NodeIdEdgesMaxId(4, Array(2)),
+    NodeIdEdgesMaxId(5, Array(1,2,3,6))).iterator
+
   val inIteratorFunc = () => Seq(NodeIdEdgesMaxId(1, Array(2,3,6)),
     NodeIdEdgesMaxId(2, Array(1, 5, 6)),
     NodeIdEdgesMaxId(3, Array(1, 6)),
     NodeIdEdgesMaxId(4, Array(1, 6))).iterator
 
+  val renumberedInIteratorFunc = () => Seq(NodeIdEdgesMaxId(1, Array(2,3,5)),
+    NodeIdEdgesMaxId(2, Array(1, 4, 5)),
+    NodeIdEdgesMaxId(3, Array(1, 5)),
+    NodeIdEdgesMaxId(6, Array(1, 5))).iterator
+
   def getNode(id: Int): Option[Node] = graph.getNodeById(id)
 
   def makeRenumberedDualGraph =
-    CachedDirectedGraph(Seq(iteratorFunc), Seq(inIteratorFunc), MoreExecutors.sameThreadExecutor(),
-      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/d"), null, 2, 2, true, "temp-cached/dtwoshards", true, false)
+    CachedDirectedGraph(Seq(renumberedIteratorFunc), Seq(renumberedInIteratorFunc), MoreExecutors.sameThreadExecutor(),
+      StoredGraphDir.BothInOut, "lru", 2, 4, Array("temp-shards/e"), null, 2, 2, true, "temp-cached/ren_dtwoshards", true, false)
 
   def makeDualGraph =
     CachedDirectedGraph(Seq(iteratorFunc), Seq(inIteratorFunc), MoreExecutors.sameThreadExecutor(),

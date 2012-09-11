@@ -60,6 +60,7 @@ object RunCDGServer {
         experiment = (sData \ "experiment").extract[String]
         iterations = (sData \ "iterations").extract[Int]
         outputDirectory = (sData \ "output_directory").extract[String]
+        renumbered = (sData \ "renumbered").extract[Boolean]
         inDisk = (sData \ "in_disk").extract[Boolean]
       })(runtime)
     }

@@ -37,6 +37,7 @@ class CachedDirectedGraphServerConfig extends ServerConfig[CachedDirectedGraphSe
   var experiment = "ptc"
   var iterations = 5
   var outputDirectory = "/path/to/outputdir"
+  var renumbered = false
   var inDisk = false
 
   def apply(runtime: RuntimeEnvironment) = {

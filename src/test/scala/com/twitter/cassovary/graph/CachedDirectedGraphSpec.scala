@@ -78,12 +78,25 @@ class CachedDirectedGraphSpec extends Specification {
     NodeIdEdgesMaxId(5, Array(2)),
     NodeIdEdgesMaxId(6, Array(1,2,3,4))).iterator
 
+  val renumberedIteratorFunc = () => Seq(NodeIdEdgesMaxId(1, Array(2,3,6)),
+    NodeIdEdgesMaxId(2, Array(1)),
+    NodeIdEdgesMaxId(3, Array(1)),
+    NodeIdEdgesMaxId(4, Array(2)),
+    NodeIdEdgesMaxId(5, Array(1,2,3,6))).iterator
+
   val zeroIteratorFunc = () => Seq(NodeIdEdgesMaxId(0, Array(1,2,3)),
     NodeIdEdgesMaxId(1, Array(0)),
     NodeIdEdgesMaxId(2, Array(0)),
     NodeIdEdgesMaxId(3, Array(2)),
     NodeIdEdgesMaxId(5, Array(6)),
     NodeIdEdgesMaxId(6, Array(1,2,3,4))).iterator
+
+  val renumberedZeroIteratorFunc = () => Seq(NodeIdEdgesMaxId(1, Array(2,3,4)),
+    NodeIdEdgesMaxId(2, Array(1)),
+    NodeIdEdgesMaxId(3, Array(1)),
+    NodeIdEdgesMaxId(4, Array(3)),
+    NodeIdEdgesMaxId(5, Array(6)),
+    NodeIdEdgesMaxId(6, Array(2,3,4,7))).iterator
 
   val edgeMap = Map(1 -> Array(2,3,4), 2 -> Array(1), 3 -> Array(1),
     4 -> Array.empty, 5 -> Array(2), 6 -> Array(1,2,3,4))
@@ -94,43 +107,43 @@ class CachedDirectedGraphSpec extends Specification {
   val renumberedReachability = List(0, 4, 4, 4, 5, 5, 1)
 
   def makeGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/1", "guava", renumber = false)
+    iteratorFunc, dir, "temp-shards/1", "guava", renumbered = false)
 
   def makeSameGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
     iteratorFunc, dir, "temp-shards/2", "guava", "temp-cached/sameGraph", false)
 
   def makeFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/3", "lru", renumber = false)
+    iteratorFunc, dir, "temp-shards/3", "lru", renumbered = false)
 
   def makeFastLRUGraphWithNodeArray(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/4", "lru_array", renumber = false)
+    iteratorFunc, dir, "temp-shards/4", "lru_array", renumbered = false)
 
   def makeFastClockGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/5", "clock", renumber = false)
+    iteratorFunc, dir, "temp-shards/5", "clock", renumbered = false)
 
   def makeRenumberedGuavaGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/6", "guava", renumber = true)
+    renumberedIteratorFunc, dir, "temp-shards/6", "guava", renumbered = true)
 
   def makeRenumberedFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/7", "lru", "temp-cached/sameGraph7", renumber = true)
+    renumberedIteratorFunc, dir, "temp-shards/7", "lru", "temp-cached/sameGraph7", renumbered = true)
 
   def makeRenumberedFastLRUGraphWithZero(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    zeroIteratorFunc, dir, "temp-shards/8", "lru", "temp-cached/sameGraph8", renumber = true)
+    renumberedZeroIteratorFunc, dir, "temp-shards/8", "lru", "temp-cached/sameGraph8", renumbered = true)
 
   def makeRenumberedFastLRUGraphWithNodeArray(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/9", "lru_array", renumber = true)
+    renumberedIteratorFunc, dir, "temp-shards/9", "lru_array", renumbered = true)
 
   def makeRenumberedBufferedFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/10", "bufflru", renumber = false)
+    iteratorFunc, dir, "temp-shards/10", "bufflru", renumbered = false)
 
   def makeLockfreeReadFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/11", "lockfreereadlru", renumber = false)
+    iteratorFunc, dir, "temp-shards/11", "lockfreereadlru", renumbered = false)
 
   def makeRandomizedFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/12", "random", renumber = false)
+    iteratorFunc, dir, "temp-shards/12", "random", renumbered = false)
 
   def makeLocklessRandomizedFastLRUGraph(dir: StoredGraphDir.StoredGraphDir) = CachedDirectedGraph(
-    iteratorFunc, dir, "temp-shards/13", "locklessrandom", renumber = false)
+    iteratorFunc, dir, "temp-shards/13", "locklessrandom", renumbered = false)
 
   def getNode(id: Int): Option[Node] = graph.getNodeById(id)
 

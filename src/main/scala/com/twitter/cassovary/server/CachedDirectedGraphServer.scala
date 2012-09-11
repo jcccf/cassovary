@@ -45,7 +45,7 @@ class CachedDirectedGraphServer(config: CachedDirectedGraphServerConfig) extends
     val graph = GraphLoader(config.graphDump,
       if (config.inGraphDump.length > 0) Some(config.inGraphDump) else None,
       config.cacheType, config.numNodes, config.numEdges, config.shardDirectories, config.inShardDirectories,
-      config.numShards, config.numRounds, true, config.cacheDirectory, config.inDisk)
+      config.numShards, config.numRounds, true, config.cacheDirectory, config.renumbered, config.inDisk)
 
 //    val graph = GraphLoader("/Volumes/Macintosh HD 2/graph_dump_random",
 //      "lru", 1000000, 200000000, "/tmp/shards_random", 256, 16, true, "/tmp/cached_random")

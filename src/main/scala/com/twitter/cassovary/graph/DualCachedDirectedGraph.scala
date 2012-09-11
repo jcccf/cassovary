@@ -36,9 +36,6 @@ object FastDualCachedDirectedGraph {
    * @param idToIntOffsetIn Offset into a shard for a specific id (in-edges)
    * @param idToNumEdgesIn Number of in-edges for a specific id
    * @param maxId Original MaxId in the out-edge graph
-   * @param realMaxId Actual MaxId (only different from maxId if the graph was renumbered)
-   * @param realMaxIdOutEdges
-   * @param realMaxIdInEdges
    * @param nodeWithOutEdgesMaxId
    * @param nodeWithOutEdgesCount
    * @param inMaxId Original MaxId in the in-edge graph
@@ -56,29 +53,28 @@ object FastDualCachedDirectedGraph {
             shardDirectories: Array[String], inShardDirectories: Array[String], numShards: Int,
             idToIntOffsetOut: Array[Long], idToNumEdgesOut: Array[Int],
             idToIntOffsetIn: Array[Long], idToNumEdgesIn: Array[Int],
-            maxId: Int, realMaxId: Int, realMaxIdOutEdges: Int, realMaxIdInEdges: Int,
-            nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
+            maxId: Int, nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
             inMaxId: Int, nodeWithInEdgesMaxId: Int, nodeWithInEdgesCount: Int,
             nodeCount: Int, edgeCount: Long,
             cacheType: String = "lru", nodeType: String = "node", inDiskParams: InDiskParams): CachedDirectedGraph = {
 
-    def makeCache(shardDirs: Array[String], idToIntOffset: Array[Long], idToNumEdges: Array[Int], realMaxId: Int) = cacheType match {
+    def makeCache(shardDirs: Array[String], idToIntOffset: Array[Long], idToNumEdges: Array[Int], maxId: Int) = cacheType match {
       case "lru" => FastLRUIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "bufflru" => BufferedFastLRUIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "lockfreereadlru" => LocklessReadFastLRUIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "random" => RandomizedIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "locklessrandom" => LocklessRandomizedIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "clock" => FastClockIntArrayCache(shardDirs, numShards,
-        realMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+        maxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case _ => throw new IllegalArgumentException("Unknown cacheType %s".format(nodeType))
     }
 
-    val outCache = makeCache(shardDirectories, idToIntOffsetOut, idToNumEdgesOut, realMaxIdOutEdges)
+    val outCache = makeCache(shardDirectories, idToIntOffsetOut, idToNumEdgesOut, nodeWithOutEdgesMaxId)
     // inCache only created if inDisk is false
 
     (inDiskParams.enabled, nodeType) match {
@@ -87,16 +83,14 @@ object FastDualCachedDirectedGraph {
         shardDirectories, numShards,
         idToIntOffsetOut, idToNumEdgesOut,
         idToIntOffsetIn, idToNumEdgesIn,
-        maxId, realMaxId, realMaxIdOutEdges, realMaxIdInEdges,
-        nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+        maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
         inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount,
         nodeCount, edgeCount, outCache,
-        makeCache(inShardDirectories, idToIntOffsetIn, idToNumEdgesIn, realMaxIdInEdges))
+        makeCache(inShardDirectories, idToIntOffsetIn, idToNumEdgesIn, nodeWithInEdgesMaxId))
       case (true, "node") => new InDiskFastDualCachedDirectedGraph(nodeIdSet,
         cacheMaxNodes, cacheMaxEdges,
         idToIntOffsetOut, idToNumEdgesOut,
-        maxId, realMaxId, realMaxIdOutEdges, realMaxIdInEdges,
-        nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+        maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
         inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount,
         nodeCount, edgeCount, outCache,
         new DiskIntArrayReader(inDiskParams.offsetLengthFilename, inShardDirectories, numShards))
@@ -114,12 +108,11 @@ class FastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
                                   val shardDirectories: Array[String], val numShards: Int,
                                   val idToIntOffsetOut: Array[Long], val idToNumEdgesOut: Array[Int],
                                   val idToIntOffsetIn: Array[Long], val idToNumEdgesIn: Array[Int],
-                                  maxId: Int, realMaxId: Int, realMaxIdOutEdges: Int, realMaxIdInEdges: Int,
-                                  nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
+                                  maxId: Int, nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
                                   inMaxId: Int, nodeWithInEdgesMaxId: Int, nodeWithInEdgesCount: Int,
                                   val nodeCount: Int, val edgeCount: Long,
                                   val outCache: IntArrayCache, val inCache: IntArrayCache)
-  extends CachedDirectedGraph(maxId, realMaxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+  extends CachedDirectedGraph(maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
     inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount) {
 
   val storedGraphDir = StoredGraphDir.BothInOut
@@ -129,8 +122,7 @@ class FastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
     shardDirectories, numShards,
     idToIntOffsetOut, idToNumEdgesOut,
     idToIntOffsetIn, idToNumEdgesIn,
-    maxId, realMaxId, realMaxIdOutEdges, realMaxIdInEdges,
-    nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+    maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
     inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount,
     nodeCount, edgeCount,
     outCache.getThreadSafeChild, inCache.getThreadSafeChild)
@@ -148,7 +140,7 @@ class FastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
   val someShapeShiftingNode = Some(shapeShiftingNode)
 
   def getNodeById(id: Int) = {
-    if (id > realMaxId || !nodeIdSet(id)) {
+    if (id > maxId || !nodeIdSet(id)) {
       None
     }
     else {
@@ -167,12 +159,11 @@ class FastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
 class InDiskFastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
                                         val cacheMaxNodes: Int, val cacheMaxEdges: Long,
                                         val idToIntOffsetOut: Array[Long], val idToNumEdgesOut: Array[Int],
-                                        maxId: Int, realMaxId: Int, realMaxIdOutEdges: Int, realMaxIdInEdges: Int,
-                                        nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
+                                        maxId: Int, nodeWithOutEdgesMaxId: Int, nodeWithOutEdgesCount: Int,
                                         inMaxId: Int, nodeWithInEdgesMaxId: Int, nodeWithInEdgesCount: Int,
                                         val nodeCount: Int, val edgeCount: Long,
                                         val outCache: IntArrayCache, val inReader: DiskIntArrayReader)
-  extends CachedDirectedGraph(maxId, realMaxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+  extends CachedDirectedGraph(maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
     inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount) {
 
   val storedGraphDir = StoredGraphDir.BothInOut
@@ -180,8 +171,7 @@ class InDiskFastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
   def getThreadSafeChild = new InDiskFastDualCachedDirectedGraph(nodeIdSet,
     cacheMaxNodes, cacheMaxEdges,
     idToIntOffsetOut, idToNumEdgesOut,
-    maxId, realMaxId, realMaxIdOutEdges, realMaxIdInEdges,
-    nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
+    maxId, nodeWithOutEdgesMaxId, nodeWithOutEdgesCount,
     inMaxId, nodeWithInEdgesMaxId, nodeWithInEdgesCount,
     nodeCount, edgeCount,
     outCache.getThreadSafeChild, inReader.getThreadSafeChild)
@@ -197,7 +187,7 @@ class InDiskFastDualCachedDirectedGraph(val nodeIdSet: (Int => Boolean),
   val someShapeShiftingNode = Some(shapeShiftingNode)
 
   def getNodeById(id: Int) = {
-    if (id > realMaxId || !nodeIdSet(id)) {
+    if (id > maxId || !nodeIdSet(id)) {
       None
     }
     else {

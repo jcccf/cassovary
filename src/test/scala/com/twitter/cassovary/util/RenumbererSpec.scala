@@ -13,6 +13,7 @@
  */
 package com.twitter.cassovary.util
 
+import io.AdjacencyListGraphReader
 import org.specs.Specification
 import java.io.File
 
@@ -62,6 +63,31 @@ class RenumbererSpec extends Specification  {
       s.translate(99) mustEqual 1
       s.translate(100) mustEqual 2
       s.reverseTranslate(3) mustEqual 1
+    }
+
+  }
+
+  "RenumbererDirectory" should {
+
+    "Renumber a directory correctly" in {
+      val tempDir = FileUtils.getTempDirectoryName
+      val tempFile = FileUtils.getTempFilename
+      GraphRenumberer.renumberAdjacencyListGraph("src/test/resources/graphs", "toy_6nodes_adj", tempDir, None, tempFile)
+
+      val g = new AdjacencyListGraphReader("src/test/resources/graphs", "toy_6nodes_adj").toSharedArrayBasedDirectedGraph()
+      val rg = new AdjacencyListGraphReader(tempDir, "part").toSharedArrayBasedDirectedGraph()
+
+      // Simple tests
+      g.edgeCount mustEqual rg.edgeCount
+      rg.maxNodeId mustEqual 6
+      rg.nodeWithOutEdgesMaxId mustEqual 6
+
+      // Check that each node has the appropriate renumbered edges
+      val ren = Renumberer.fromFile(tempFile)
+      g.foreach { node =>
+        val rid = ren.translate(node.id)
+        ren.translateArray(node.outboundNodes().toArray).toSet mustEqual rg.getNodeById(rid).get.outboundNodes().toSet
+      }
     }
 
   }

@@ -13,7 +13,28 @@
  */
 package com.twitter.cassovary.util
 
+import io.AdjacencyListGraphReader
 import net.lag.logging.Logger
+import java.util.concurrent.{ExecutorService, Future, Executors}
+import com.twitter.ostrich.stats.Stats
+import com.twitter.cassovary.graph.NodeIdEdgesMaxId
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+
+object Renumberer {
+
+  def apply(maxId: Int) = {
+    new Renumberer(maxId)
+  }
+
+  def fromFile(filename: String) = {
+    val r = new Renumberer(0)
+    val rd = new LoaderSerializerReader(filename)
+    r.fromReader(rd)
+    rd.close
+    r
+  }
+}
 
 /**
  * Renumber integer ids to integers in increasing order (hereby referred to as indices)
@@ -35,11 +56,13 @@ class Renumberer(var maxId: Int) {
    * @param id id to map/translate
    * @return index corresponding to id
    */
-  def translate(id: Int): Int = synchronized {
+  def translate(id: Int): Int = {
     if (idToIndex(id) == 0) {
-      index += 1
-      idToIndex(id) = index
-      index
+      synchronized {
+        index += 1
+        idToIndex(id) = index
+        index
+      }
     }
     else {
       idToIndex(id)
@@ -123,5 +146,119 @@ class Renumberer(var maxId: Int) {
     idToIndex = reader.arrayOfInt()
     maxId = idToIndex.size - 1
     index = reader.int
+  }
+}
+
+object GraphRenumberer {
+  case class MaxIdsEdges(localMaxId:Int, localNodeWithoutOutEdgesMaxId:Int, numEdges:Int, nodeCount:Int)
+  lazy val log = Logger.get("GraphRenumberer")
+
+  /**
+   * Given a directory containing a graph in the AdjacencyList format, renumber the nodes,
+   * thus compacting the id space
+   * @param sourceDirectory Original graph directory
+   * @param prefixFilenames Filename prefix in the original graph directory
+   * @param destinationDirectory Directory the renumbered graph should be written to
+   * @param renumberer Provide a Renumberer if you want to use a particular mapping
+   * @param renumbererFile Where the Renumberer will be written to (since it may get resized or new entries added)
+   * @param executorService Executor service to use (defaults to using 10 threads)
+   */
+  def renumberAdjacencyListGraph(sourceDirectory: String, prefixFilenames: String, destinationDirectory: String, renumberer: Option[Renumberer],
+                        renumbererFile: String, executorService: ExecutorService = Executors.newFixedThreadPool(10)) = {
+
+    if (new File(destinationDirectory+"/done_marker.summ").exists()) {
+      log.info("Some graph already exists at %s!".format(destinationDirectory))
+    }
+    else {
+      val iteratorSeq = new AdjacencyListGraphReader(sourceDirectory, prefixFilenames).iteratorSeq
+
+      // Load graph once to get maxId
+      log.info("Loading graph to determine maxId...")
+      var maxId = 0
+      var nodeWithOutEdgesMaxId = 0
+      var numEdges = 0
+      var nodeWithOutEdgesCount = 0
+      val futures1 = Stats.time("graph_load_reading_maxid_and_calculating_numedges") {
+        def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) = {
+          var localMaxId, localNodeWithOutEdgesMaxId, numEdges, nodeCount = 0
+          iteratorFunc().foreach { item =>
+          // Keep track of Max IDs
+            localMaxId = localMaxId max item.maxId
+            localNodeWithOutEdgesMaxId = localNodeWithOutEdgesMaxId max item.id
+            // Update nodeCount and total edges
+            numEdges += item.edges.length
+            nodeCount += 1
+          }
+          MaxIdsEdges(localMaxId, localNodeWithOutEdgesMaxId, numEdges, nodeCount)
+        }
+        ExecutorUtils.parallelWork[() => Iterator[NodeIdEdgesMaxId], MaxIdsEdges](executorService,
+          iteratorSeq, readOutEdges)
+      }
+      futures1.toArray map { future =>
+        val f = future.asInstanceOf[Future[MaxIdsEdges]]
+        val MaxIdsEdges(localMaxId, localNWOEMaxId, localNumEdges, localNodeCount) = f.get
+        maxId = maxId max localMaxId
+        nodeWithOutEdgesMaxId = nodeWithOutEdgesMaxId max localNWOEMaxId
+        numEdges += localNumEdges
+        nodeWithOutEdgesCount += localNodeCount
+      }
+
+      val ren = renumberer match {
+        case None => new Renumberer(maxId)
+        case Some(r) => {
+          if (r.maxId < maxId) {
+            log.info("Resizing from %s to %s".format(r.maxId, maxId))
+            r.resize(maxId)
+          }
+          r
+        }
+      }
+
+      // Load graph a second time to map only the out-nodes
+      log.info("Loading graph again to map only out-nodes...")
+      val futures2 = Stats.time("graph_load_renumbering_nodes_with_outedges") {
+        def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) = {
+          iteratorFunc().foreach { item =>
+            ren.translate(item.id)
+          }
+        }
+        ExecutorUtils.parallelWork[() => Iterator[NodeIdEdgesMaxId], Unit](executorService,
+          iteratorSeq, readOutEdges)
+      }
+      futures2.toArray map { future => future.asInstanceOf[Future[Unit]].get }
+      assert(ren.count == nodeWithOutEdgesCount) // Sanity check
+
+      // Load graph a final time to map the edges and write them out
+      log.info("Loading graph to write out the renumbered version...")
+      FileUtils.makeDirs(destinationDirectory)
+      val shardCounter = new AtomicInteger()
+      val futures3 = Stats.time("graph_load_write_nodes_with_outedges") {
+        def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) = {
+          val f = FileUtils.printWriter("%s/part-r-%05d".format(destinationDirectory, shardCounter.getAndIncrement))
+          iteratorFunc().foreach { item =>
+            val id = ren.translate(item.id)
+            val edgeIds = ren.translateArray(item.edges)
+            f.println("%s\t%s".format(id, item.edges.length))
+            edgeIds.foreach { eid => f.println(eid) }
+          }
+          f.close()
+        }
+        ExecutorUtils.parallelWork[() => Iterator[NodeIdEdgesMaxId], Unit](executorService,
+          iteratorSeq, readOutEdges)
+      }
+      futures3.toArray map { future => future.asInstanceOf[Future[Unit]].get }
+
+      FileUtils.printToFile(new File(destinationDirectory+"/done_marker.summ")) { p =>
+        p.println(ren.count + "\t" + ren.count + "\t" + numEdges)
+      }
+
+      // Write mapping out
+      log.info("Writing mapping out...")
+      val serializer = new LoaderSerializerWriter(renumbererFile)
+      ren.toWriter(serializer)
+      serializer.close
+
+      log.info("Done!")
+    }
   }
 }

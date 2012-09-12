@@ -39,7 +39,8 @@ object RenumberGraphDirectory {
       None
     }
 
-    GraphRenumberer.renumberAdjacencyListGraph(args(0), args(1), args(2), None, args(3))
+    GraphRenumberer.renumberAdjacencyListGraph(args(0), args(1), args(2), ren, args(3))
+    println("Done!")
   }
 
 }

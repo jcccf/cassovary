@@ -216,6 +216,7 @@ object GraphRenumberer {
 
       // Load graph a second time to map only the out-nodes
       log.info("Loading graph again to map only out-nodes...")
+      val oldCount = ren.count
       val futures2 = Stats.time("graph_load_renumbering_nodes_with_outedges") {
         def readOutEdges(iteratorFunc: () => Iterator[NodeIdEdgesMaxId]) = {
           iteratorFunc().foreach { item =>
@@ -226,7 +227,13 @@ object GraphRenumberer {
           iteratorSeq, readOutEdges)
       }
       futures2.toArray map { future => future.asInstanceOf[Future[Unit]].get }
-      assert(ren.count == nodeWithOutEdgesCount) // Sanity check
+
+      // Sanity Check
+      if (oldCount == 0) {
+        assert(ren.count == nodeWithOutEdgesCount)
+      } else {
+        assert(ren.count >= nodeWithOutEdgesCount)
+      }
 
       // Load graph a final time to map the edges and write them out
       log.info("Loading graph to write out the renumbered version...")

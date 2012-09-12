@@ -1,0 +1,21 @@
+{
+    "server": {
+        "nodelist": "/temp/node.txt",
+        "verbose": true,
+        "graph_dump": "/temp/graph",
+        "in_graph_dump": "",
+        "cache_type": "lru",
+        "num_nodes": 1000000,
+        "num_edges": 200000000,
+        "shard_directories": "/temp/shards",
+        "in_shard_directories": "",
+        "num_shards": 256,
+        "num_rounds": 16,
+        "cache_directory": "/temp/cached",
+        "output_directory": "/temp/out",
+        "experiment": "ptc",
+        "iterations": 10,
+        "renumbered": false,
+        "in_disk": false
+    }
+}

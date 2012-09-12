@@ -27,6 +27,7 @@ cd scripts/scala
 
 echo Copying into the jars folder...
 mkdir -p jars
+rm -rf jars/*
 cp $HOME/.sbt/boot/scala-2.8.1/lib/scala-library.jar jars;
 find $root/target -name 'cassovary*.jar' -exec cp {} jars \;
 find $root/lib_managed/jars/ -name '*.jar' -exec cp {} jars \;

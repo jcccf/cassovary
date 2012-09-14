@@ -47,15 +47,11 @@ class PrecachedPtcExperiment(config: CachedDirectedGraphServerConfig,
     def iterator = nodes.values.iterator.filter { _ != null }
 
     def getNodeById(id: Int) = {
-      if (id >= nodes.size) {
-        None
-      } else {
-        val node = nodes(id)
-        if (node == null) {
-          None
-        } else {
-          Some(node)
-        }
+      try {
+        Some(nodes(id))
+      }
+      catch {
+        case _ => None
       }
     }
   }
@@ -76,7 +72,7 @@ class PrecachedPtcExperiment(config: CachedDirectedGraphServerConfig,
 
         // Get all nodes up to 2 steps out
         val emptyArray = Array.empty[Int]
-        val ns = graph.getNodeById(i).get.outboundNodes()
+        val ns = graph.getNodeById(i).get.outboundNodes().toArray[Int]
         val nodeMap = new HashMap[Int, Node]()
         ns.foreach { n =>
           val outboundNodes = graph.getNodeById(n).get.outboundNodes().toArray[Int]
@@ -85,6 +81,7 @@ class PrecachedPtcExperiment(config: CachedDirectedGraphServerConfig,
           }
           nodeMap.put(n, UniDirectionalNode(n, outboundNodes, StoredGraphDir.OnlyOut))
         }
+        nodeMap.put(i, UniDirectionalNode(i, ns, StoredGraphDir.OnlyOut))
 
         // Generate a graph
         val genGraph = new TinyGraph(nodeMap, 0, 0, 0, 0, 0, StoredGraphDir.OnlyOut)

@@ -14,6 +14,10 @@
 import com.twitter.cassovary.util.{LoaderSerializerWriter, FileUtils, LoaderSerializerReader, Renumberer}
 import java.io.File
 
+/**
+ * Resize a renumberer file. This is useful if you want to translate
+ * new ids which exceed the previous maxId of the old renumberer.
+ */
 object RenumbererResize {
   def main(args: Array[String]) {
     var renumberer: Renumberer = new Renumberer(1)

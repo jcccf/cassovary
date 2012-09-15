@@ -18,7 +18,7 @@ object LargeRandomGraphGenerator {
     // Write edges to files
     var j = 0
     var nodeCount = 0
-    var edgeCount = 0
+    var edgeCount = 0L
     var p: PrintWriter = null
     for (i <- 1 to numNodes) {
       // Make a new PrintWriter if we need to make a new part file

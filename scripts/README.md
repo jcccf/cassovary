@@ -12,7 +12,13 @@ reduce the heap size. For example,
 Allows a maximum heap size of 8 GB and allows Java to start off with a heap size of 4 GB.
 
 
-### RenumberGraphDirectory [path/to/graph_dump] [path/to/target_output_directory] [path/to/mapping]
+### LargeRandomGraphGenerator outputDirectory numParts numNodes approxNumEdges
+
+Generate a random graph written to the outputDirectory in several parts. Define the total number of nodes and total
+number of edges. The number of edges is approximate because the number of edges generated for each node is randomly
+determined. Can generate graphs with billions of edges using a small amount of memory.
+
+### RenumberGraphDirectory path/to/graph_dump input_file_prefix path/to/target_output_directory path/to/new_mapping [path/to/old_mapping]
 Renumbers an input graph directory, providing the output as well as the mapping, which
 can also be used by RenumbererMapper. The input graph directory must contain "part-r-XXXXX" files,
 which contain edges in the following form:
@@ -25,8 +31,13 @@ In the above example, the node with id 5 has 2 edges, namely to ids 6 and 19,
 and the node with id 23 has 1 edge to id 18. If an invalid directory is provided, the output
 is undefined.
 
+The input_prefix allows you to filter files in the input directory
+that you don't want processed. If you don't provide an old_mapping file, then a new one will
+be generated and written to new_mapping. If you do provide one, a new one will still be written
+to new_mapping, as we might encounter node ids that haven't been translated yet.
 
-### RenumbererMapper [maxId | path/to/step2xr2.txt] [path/to/inputIds path/to/outputIndices [reverse]]
+
+### RenumbererMapper (maxId | path/to/step2xr2.txt) path/to/inputIds path/to/outputIndices [reverse]
 
 interactive terminal for the renumberer. If you provide a number as the argument, an empty
 Renumberer is initialized with that capacity. If you provide a path to a Renumberer dump file
@@ -40,8 +51,7 @@ If you provide a 4th argument, then a reverse mapping will be computed for the f
 For example, if there is a mapping from 1 -> 4, and the line "4 3 2 1 0" is provided,
 then the line "1 3 2 1 0" is returned.
 
-
-### RunCDGServer [config.json]
+### RunCDGServer config.json
 
 Runs a CachedDirectedGraph server to demonstrate Ostrich stats collection. Provide a config.json
 file to configure the settings for this server.

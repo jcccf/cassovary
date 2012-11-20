@@ -62,6 +62,7 @@ object RunCDGServer {
         outputDirectory = (sData \ "output_directory").extract[String]
         renumbered = (sData \ "renumbered").extract[Boolean]
         inDisk = (sData \ "in_disk").extract[Boolean]
+        walkDepth = (sData \ "walk_depth").extract[Int]
       })(runtime)
     }
 

@@ -16,6 +16,7 @@
         "experiment": "ptc",
         "iterations": 10,
         "renumbered": false,
-        "in_disk": false
+        "in_disk": false,
+        "walk_depth": 3
     }
 }

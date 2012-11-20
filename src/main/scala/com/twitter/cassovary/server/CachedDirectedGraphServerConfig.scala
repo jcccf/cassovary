@@ -39,6 +39,7 @@ class CachedDirectedGraphServerConfig extends ServerConfig[CachedDirectedGraphSe
   var outputDirectory = "/path/to/outputdir"
   var renumbered = false
   var inDisk = false
+  var walkDepth = 3
 
   def apply(runtime: RuntimeEnvironment) = {
     new CachedDirectedGraphServer(this)

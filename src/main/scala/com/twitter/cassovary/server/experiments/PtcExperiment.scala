@@ -30,6 +30,7 @@ class PtcExperiment(config: CachedDirectedGraphServerConfig,
 
   val nodeList = config.nodeList
   val verbose = config.verbose
+  val walkDepth = config.walkDepth
 
   def ptc(nodeList: String, graph: CachedDirectedGraph, graphUtils: GraphUtils, walkParams: RandomWalkParams) {
     var j = 0
@@ -75,9 +76,9 @@ class PtcExperiment(config: CachedDirectedGraphServerConfig,
   def run {
     // Do a random walk
     val walkParams = if (verbose)
-      RandomWalkParams(10000, 0.0, Some(2000), Some(1), Some(3), false, GraphDir.OutDir, false, true)
+      RandomWalkParams(10000, 0.0, Some(2000), Some(1), Some(walkDepth), false, GraphDir.OutDir, false, true)
     else
-      RandomWalkParams(10000, 0.0, Some(2000), None, Some(3), false, GraphDir.OutDir, false, true)
+      RandomWalkParams(10000, 0.0, Some(2000), None, Some(walkDepth), false, GraphDir.OutDir, false, true)
 
     val nodeFile = new File(nodeList)
     if (nodeFile.isDirectory) {

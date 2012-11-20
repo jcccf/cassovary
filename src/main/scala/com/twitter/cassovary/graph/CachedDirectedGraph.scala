@@ -517,6 +517,8 @@ object FastCachedDirectedGraph {
         nodeWithOutEdgesMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case "clock" => FastClockIntArrayCache(shardDirectories, numShards,
         nodeWithOutEdgesMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
+      case "nocache" => NotAnIntArrayCache(shardDirectories, numShards,
+        nodeWithOutEdgesMaxId, cacheMaxNodes, cacheMaxEdges, idToIntOffset, idToNumEdges)
       case _ => throw new IllegalArgumentException("Unknown cacheType %s".format(nodeType))
     }
 

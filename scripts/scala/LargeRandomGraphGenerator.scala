@@ -18,7 +18,7 @@ object LargeRandomGraphGenerator {
     // Write edges to files
     var j = 0
     var nodeCount = 0
-    var edgeCount = 0
+    var edgeCount = 0L
     var p: PrintWriter = null
     for (i <- 1 to numNodes) {
       // Make a new PrintWriter if we need to make a new part file
@@ -27,7 +27,7 @@ object LargeRandomGraphGenerator {
         p = FileUtils.printWriter(directory+"/part-r-%05d".format(j))
         j += 1
       }
-      val edges = Seq.fill(Random.nextInt(randUpperLimit))(Random.nextInt(numNodes)).toSet.filter(k => k != i)
+      val edges = Seq.fill(Random.nextInt(randUpperLimit))(Random.nextInt(numNodes)+1).toSet.filter(k => k != i)
       val numEdges = edges.size
       p.println(i + "\t" + numEdges)
       edges.foreach { k => p.println(k) }

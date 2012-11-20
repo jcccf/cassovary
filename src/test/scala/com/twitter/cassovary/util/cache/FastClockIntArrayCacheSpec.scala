@@ -35,6 +35,20 @@ class FastClockIntArrayCacheSpec extends Specification {
       fc.numbers.hits mustEqual 1
     }
 
+    "Single Item Must Evict" in {
+      val fc = FastClockIntArrayCache(Array(tempDir), 10, 4, 1, 10, offset, edges)
+      fc.get(1)
+      fc.get(2)
+      fc.get(1)
+      fc.get(2)
+      fc.get(4)
+      fc.get(2)
+      fc.get(4)
+      fc.get(2)
+      fc.numbers.misses mustEqual 8
+      fc.numbers.hits mustEqual 0
+    }
+
     "Evict Properly" in {
       val fc = FastClockIntArrayCache(Array(tempDir), 10, 4, 2, 3, offset, edges)
       fc.get(1)
